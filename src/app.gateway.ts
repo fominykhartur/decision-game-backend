@@ -67,9 +67,17 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.server.emit("getRooms", this.roomList)
   }
 
-  @SubscribeMessage('getChoose')
-  handleClientChoose(@MessageBody() buttonID: string, @ConnectedSocket() client: Socket) : void {
-    this.logger.log(`Client ${client.id} clicked button ${buttonID}`)
+  @SubscribeMessage('getChoice')
+  handleClientChoose(@MessageBody() data: string, @ConnectedSocket() client: Socket) : void {
+    this.logger.log(`Client ${client.id} clicked button ${data['buttonID']}`)
+    this.roomList.forEach( room => {
+      if(room['roomName'] === data['roomName']){
+        // console.log(client.id, data['enemySocketID'])
+        room['rounds'][data['roundNumber']].playersData.find(player => player.playerSocketID === client.id).playerChoice = data['buttonID']
+        room['rounds'][data['roundNumber']].playersData.find(player => player.playerSocketID === data['enemySocketID']).enemyChoice = data['buttonID']
+        // console.log(room['rounds'][data['roundNumber']].playersData)
+      }
+    })
   }
   
   @SubscribeMessage('createRoom')
@@ -82,7 +90,8 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       playersCount : Array.from(this.server.sockets.adapter.rooms.get(data['room'])).length,
       playersInfo : [{socketID : client.id,
                       playerName : data.playerName,
-                      }]
+                      }],
+      rounds : []
     })
 
     this.server.emit("getRooms", this.roomList)
@@ -144,12 +153,6 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.server.emit("getRooms", this.roomList)
   }
 
-  @SubscribeMessage('startGame')
-  handleGameStart(@MessageBody() data, @ConnectedSocket() client: Socket) : void {
-    this.server.to(data['roomName']).emit('gameStatus', true)
-    this.logger.log(`Game started in room ${data['roomName']}`)
-  }
-
   @SubscribeMessage('triggerStart')
   handleTriggerStart(@MessageBody() data, @ConnectedSocket() client: Socket) : void {
     this.server.to(data['roomName']).emit('triggerStartGame')
@@ -157,11 +160,100 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.logger.log(`Game in room ${data['roomName']} triggered`)
   }
 
+  @SubscribeMessage('startGame')
+  handleGameStart(@MessageBody() data, @ConnectedSocket() client: Socket) : void {
+    this.server.to(data['roomName']).emit('gameStatus', true)
+    this.roomList.forEach(room => {
+      if(room['roomName'] === data['roomName']){
+        room['rounds'].push({
+                  round : 'round_1',
+                  playersData : this.generateGameData(room['playersInfo'])
+        })
+
+      this.server.to(data['roomName']).emit('roomData', room)
+      // this.server.to(data['roomName']).emit('getGameData', room)
+      }
+    })
+    this.logger.log(`Game started in room ${data['roomName']}`)
+  }
+
+  generateGameData(players) : Array<object> {
+    var playersData = []
+    var enemyList = [...players]
+    this.logger.log('Init round')
+    players.forEach( player => {
+
+      if(playersData.some(item => item.playerSocketID === player.socketID)){
+        return ;
+      }
+
+      do{
+        var enemyIndex : number = Math.floor(Math.random() * (enemyList.length - 0)) + 0
+      }
+      while(player === enemyList[enemyIndex])
+
+      playersData.push({
+        playerSocketID : player.socketID,
+        enemySocketID : enemyList[enemyIndex].socketID,
+        playerChoice : 'A',
+        enemyChoice : 'A',
+        playerCount : 3
+      })
+
+      playersData.push({
+        playerSocketID : enemyList[enemyIndex].socketID,
+        enemySocketID : player.socketID,
+        playerChoice : 'A',
+        enemyChoice : 'A',
+        playerCount : 3
+      })
+      enemyList.splice(enemyIndex, 1)
+      var playerIndex : number = enemyList.indexOf(player)
+      enemyList.splice(playerIndex, 1)
+
+    })
+    return playersData
+  }
+
+  // gameData:roomName,
+  // rounds : [
+  //   {
+  //     roundCount : 'round_1',
+  //     playersData : [
+        
+  //     ]
+  //   }
+  // ]
+
+  @SubscribeMessage('endRound')
+  handleEndRound(@MessageBody() data, @ConnectedSocket() client: Socket) : void {
+    this.logger.log('Конец раунда')
+
+    this.roomList.forEach(room =>{
+      if(room['roomName'] === data['roomName']){
+        console.log(room['rounds'][data['roundNumber']].playersData)
+        room['rounds'][data['roundNumber']].playersData.forEach( player =>{
+          player['playerCount'] = this.calculateCount(player['playerChoice'], player['enemyChoice'], player['playerCount'])
+        })
+        console.log(room['rounds'][data['roundNumber']].playersData)
+      }
+    })
+  }
+
+calculateCount(playerChoice, enemyChoice, count) : number {
+  console.log('______________',playerChoice + enemyChoice)
+  switch (playerChoice + enemyChoice){
+    case 'AA': return count += 2
+    case 'AB': return count -= 3
+    case 'BA': return count += 3
+    case 'BB': return count 
+  }
+}
+
   @SubscribeMessage('gameChat')
   handleGameChat(@MessageBody() chatMessage: string, @ConnectedSocket() client: Socket) : void {
     this.server.to(chatMessage[0]).emit(`getChatMessage`, chatMessage[1])
     this.logger.log(`Client ${client.id} send to room ${chatMessage[0]} message:\n${chatMessage[1]}`)
   }
-
 }
 
