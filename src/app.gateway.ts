@@ -166,7 +166,7 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.roomList.forEach(room => {
       if(room['roomName'] === data['roomName']){
         room['rounds'].push({
-                  round : 'round_1',
+                  round : 'round_0',
                   playersData : this.generateGameData(room['playersInfo'])
         })
 
@@ -181,9 +181,10 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     var playersData = []
     var enemyList = [...players]
     this.logger.log('Init round')
+
     players.forEach( player => {
 
-      if(playersData.some(item => item.playerSocketID === player.socketID)){
+      if(playersData.some(item => item.playerSocketID === (player.socketID || player.playerSocketID))){
         return ;
       }
 
@@ -193,20 +194,21 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       while(player === enemyList[enemyIndex])
 
       playersData.push({
-        playerSocketID : player.socketID,
-        enemySocketID : enemyList[enemyIndex].socketID,
+        playerSocketID : player.socketID || player.playerSocketID,
+        enemySocketID : enemyList[enemyIndex].socketID || enemyList[enemyIndex].playerSocketID,
         playerChoice : 'A',
         enemyChoice : 'A',
-        playerCount : 3
+        playerCount : player.playerCount === 0 ? 0 : player.playerCount || 3
       })
 
       playersData.push({
-        playerSocketID : enemyList[enemyIndex].socketID,
-        enemySocketID : player.socketID,
+        playerSocketID : enemyList[enemyIndex].socketID || enemyList[enemyIndex].playerSocketID,
+        enemySocketID : player.socketID || player.playerSocketID,
         playerChoice : 'A',
         enemyChoice : 'A',
-        playerCount : 3
+        playerCount : enemyList[enemyIndex].playerCount === 0 ? 0 : enemyList[enemyIndex].playerCount || 3
       })
+
       enemyList.splice(enemyIndex, 1)
       var playerIndex : number = enemyList.indexOf(player)
       enemyList.splice(playerIndex, 1)
@@ -236,8 +238,21 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
           player['playerCount'] = this.calculateCount(player['playerChoice'], player['enemyChoice'], player['playerCount'])
         })
         console.log(room['rounds'][data['roundNumber']].playersData)
+
+        data['roundNumber']++
+
+        room['rounds'].push({
+                  round : 'round_' + data['roundNumber'],
+                  playersData : this.generateGameData(room['rounds'][data['roundNumber'] - 1]['playersData'])
+        })
+
+        this.server.to(data['roomName']).emit('roomData', room)
       }
     })
+
+    if(data['roundNumber'] !== 10){
+      this.server.to(data['roomName']).emit('startNewRound')
+    }
   }
 
 calculateCount(playerChoice, enemyChoice, count) : number {
