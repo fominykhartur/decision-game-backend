@@ -52,6 +52,12 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     //     }
     //   })
     // })
+    // Array.from(this.server.sockets.adapter.rooms.get(data['room'])).length
+    // if(this.roomList.length > 0){
+    //   this.roomList.forEach(room => {
+    //     console.log(`${room['roomName']} ${Array.from(this.server.sockets.adapter.rooms.get(room['roomName'])).length}`)
+    //   })
+    // }
     this.logger.log(`Num of  connected Clients: ${this.clientCount}\n${this.clientList}`)
     this.server.emit("getClientCount", this.clientCount)
     this.server.emit("getClientList", this.clientList) 
@@ -150,6 +156,7 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         room['playersInfo'].splice(room['playersInfo'].indexOf(leavingPlayerData), 1)
         // this.clientList.splice(this.clientList.indexOf(client.id), 1)\
 
+        console.log(`Количетсво игроков в комнате ${room['roomName']} ${room['playersCount']}`)
         this.server.to(data['roomName']).emit('roomData', room)
         this.logger.log(`Player ${client.id} leaved room ${data['roomName']}`)
         // this.logger.log(room)
@@ -301,6 +308,7 @@ handleTriggerEndGame(@MessageBody() data, @ConnectedSocket() client: Socket) : v
       })
 
       this.server.to(data['roomName']).emit('roomData', room)
+      this.server.to(data['roomName']).emit('showResult')
     }
   })
 }
