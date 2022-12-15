@@ -94,6 +94,7 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     // this.roomList.push(data[1])
     this.roomList.push({
       roomName : data['room'],
+      gameStarted: false,
       playersCount : Array.from(this.server.sockets.adapter.rooms.get(data['room'])).length,
       playersInfo : [{socketID : client.id,
                       playerName : data.playerName,
@@ -167,6 +168,12 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
   @SubscribeMessage('triggerStart')
   handleTriggerStart(@MessageBody() data, @ConnectedSocket() client: Socket) : void {
+    this.roomList.forEach(room =>{
+      if(room['roomName'] === data['roomName']){
+        room['gameStarted'] = true
+      }
+    })
+    this.server.to('Lobby').emit("getRooms", this.roomList)
     this.server.to(data['roomName']).emit('triggerStartGame')
     this.server.to(client.id).emit('hostStatus', true)
     this.logger.log(`Game in room ${data['roomName']} triggered`)
@@ -273,7 +280,6 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   }
 
 calculateCount(playerChoice, enemyChoice, count) : number {
-  console.log('______________',playerChoice + enemyChoice)
   switch (playerChoice + enemyChoice){
     case 'AA': return count += 2
     case 'AB': return count -= 3
