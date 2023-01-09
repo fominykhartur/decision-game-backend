@@ -72,6 +72,9 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.server.emit("getClientCount", this.clientCount)
     this.server.emit("getClientList", this.clientList)
     this.server.to('Lobby').emit("getRooms", this.roomList)
+    this.server.to(client.id).emit(`getChatData`, {message:`Онлайн лобби: ${this.clientCount}`,
+                                                   playerName: 'Администратор Zero'
+                                                  })
   }
 
   @SubscribeMessage('getChoice')
@@ -321,9 +324,11 @@ handleTriggerEndGame(@MessageBody() data, @ConnectedSocket() client: Socket) : v
 
 
   @SubscribeMessage('gameChat')
-  handleGameChat(@MessageBody() chatMessage: string, @ConnectedSocket() client: Socket) : void {
-    this.server.to(chatMessage[0]).emit(`getChatMessage`, chatMessage[1])
-    this.logger.log(`Client ${client.id} send to room ${chatMessage[0]} message:\n${chatMessage[1]}`)
+  handleGameChat(@MessageBody() data: string, @ConnectedSocket() client: Socket) : void {
+    this.server.to(data['currentRoom']).emit(`getChatData`, {message:data['message'],
+                                                             playerName: data['playerName']
+                                                            })
+    this.logger.log(`Client ${client.id} send to room ${data['currentRoom']} message:\n${data['message']}`)
   }
 }
 
